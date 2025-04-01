@@ -1,0 +1,9 @@
+fastapi[standard]>=0.115.8,<0.116.0
+fastapi-mail>=1.4.2, <1.5.0
+fastapi-pagination>=0.12.31, <0.13.0
+pydantic>=2.10.6,<2.11.0
+sqlalchemy>=2.0.37,<2.1.0
+psycopg2>=2.9.10,<2.10.0
+sqladmin[full]>=0.20.1, <0.21.0
+uvicorn>=0.34.0,<0.35.0
+requests>=2.32.3,<2.33.0
