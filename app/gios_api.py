@@ -27,7 +27,7 @@ class GiosAPI:
             )
 
             page += 1
-            sleep(5)
+            sleep(35)
         return sensors_data_list
 
     @staticmethod
@@ -50,7 +50,7 @@ class GiosAPI:
             )
 
             page += 1
-            sleep(2)
+            sleep(35)
 
         return stations_data_list
 
