@@ -79,8 +79,15 @@ def drop_all_tables(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/sensors")
-def get_all_sensors(db: Session = Depends(get_db)) -> list[schemes.SensorSchema]:
-    return db.query(models.Sensor).all()
+def get_all_sensors_by_station_id(station_code: Annotated[str, Query(description="Station Code")], 
+                                  include_inactive: Annotated[bool, Query(description="Include inactive stations")] = False, 
+                                  db: Session = Depends(get_db)) -> Page[schemes.SensorSchema]:
+    query = db.query(models.Sensor).filter(models.Sensor.station_code == station_code)
+
+    if not include_inactive:
+        query = query.filter(models.Sensor.end_date.is_(None))
+    
+    return paginate(query)   
 
 @router.get("/stations")
 def get_all_stations(
