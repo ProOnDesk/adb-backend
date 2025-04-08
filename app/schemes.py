@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class SensorSchema(BaseModel):
     id: int
     code: str
+    station_code: str
     indicator_code: str
     indicator_name: str
     averaging_time: Optional[str]
