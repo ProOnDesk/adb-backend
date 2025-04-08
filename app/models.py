@@ -34,8 +34,7 @@ class Sensor(Base):
 
     id = Column(Integer, primary_key=True, unique=True, index=True)
     code = Column(String, nullable=False, unique=True)
-
-    station_id = Column(Integer, ForeignKey("stations.id"))
+    station_code = Column(String, ForeignKey("stations.code"))
     indicator_code = Column(String, nullable=False)
     indicator_name = Column(String, nullable=False)
     averaging_time = Column(String, nullable=True)
@@ -47,3 +46,4 @@ class Sensor(Base):
 
     def __repr__(self):
         return f"Sensor({self.code}, {self.indicator_code}, {self.averaging_time}, {self.station_code})"
+        

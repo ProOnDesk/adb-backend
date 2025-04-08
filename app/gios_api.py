@@ -27,7 +27,9 @@ class GiosAPI:
             )
 
             page += 1
-            sleep(35)
+            
+            sleep(31) 
+        
         return sensors_data_list
 
     @staticmethod
@@ -50,7 +52,7 @@ class GiosAPI:
             )
 
             page += 1
-            sleep(35)
+            sleep(31)
 
         return stations_data_list
 
@@ -92,6 +94,10 @@ class GiosAPI:
         sensors_data = cls.fetch_sensors_data()
 
         for s in sensors_data:
+            
+            if db.query(Station).filter_by(id=int(s.get("Nr"))).first():
+                continue
+
             sensor = Sensor(
                 id=int(s.get("Nr")),
                 code=s.get("Kod stanowiska"),
