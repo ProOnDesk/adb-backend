@@ -1,4 +1,6 @@
-from fastapi import APIRouter
+from typing import Annotated, Literal
+from fastapi import APIRouter, Query
+from pydantic import BaseModel
 from app.config import settings
 from app.gios_api import GiosAPI
 from fastapi import APIRouter, HTTPException, status, Depends, Request
@@ -6,6 +8,9 @@ from sqlalchemy import MetaData, text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from app.database import engine, Base, get_db
+from app import models, schemes
+from fastapi_pagination.ext.sqlalchemy import paginate
+from fastapi_pagination import Page
 
 router = APIRouter(prefix=settings.API_V1_STR)
 
@@ -71,3 +76,40 @@ def drop_all_tables(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR500, detail=str(e)
         )
+
+
+@router.get("/sensors")
+def get_all_sensors(db: Session = Depends(get_db)) -> list[schemes.SensorSchema]:
+    return db.query(models.Sensor).all()
+
+@router.get("/stations")
+def get_all_stations(
+    voivodeship: Annotated[Literal[
+        "PODKARPACKIE",
+        "MAZOWIECKIE",
+        "POMORSKIE",
+        "WIELKOPOLSKIE",
+        "ZACHODNIOPOMORSKIE",
+        "LUBUSKIE",
+        "DOLNOŚLĄSKIE",
+        "OPOLSKIE",
+        "ŁÓDZKIE",
+        "ŚWIĘTOKRZYSKIE",
+        "MAŁOPOLSKIE",
+        "ŚLĄSKIE",
+        "LUBUSKIE",
+        "KUJAWSKO-POMORSKIE",
+        "WARMINSKO-MAZURSKIE",
+    ] | None, Query()] = None,
+     include_inactive: Annotated[bool, Query(description="Include inactive stations")] = False,
+    db: Session = Depends(get_db)
+) -> Page[schemes.StationSchema]:
+    query = db.query(models.Station)
+
+    if voivodeship:
+        query = query.filter(models.Station.voivodeship == voivodeship)
+
+    if not include_inactive:
+        query = query.filter(models.Station.end_date.is_(None))
+
+    return paginate(query)
