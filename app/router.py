@@ -79,37 +79,48 @@ def drop_all_tables(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/sensors")
-def get_all_sensors_by_station_id(station_code: Annotated[str, Query(description="Station Code")], 
-                                  include_inactive: Annotated[bool, Query(description="Include inactive stations")] = False, 
-                                  db: Session = Depends(get_db)) -> Page[schemes.SensorSchema]:
+def get_all_sensors_by_station_id(
+    station_code: Annotated[str, Query(description="Station Code")],
+    include_inactive: Annotated[
+        bool, Query(description="Include inactive stations")
+    ] = False,
+    db: Session = Depends(get_db),
+) -> Page[schemes.SensorSchema]:
     query = db.query(models.Sensor).filter(models.Sensor.station_code == station_code)
 
     if not include_inactive:
         query = query.filter(models.Sensor.end_date.is_(None))
-    
-    return paginate(query)   
+
+    return paginate(query)
+
 
 @router.get("/stations")
 def get_all_stations(
-    voivodeship: Annotated[Literal[
-        "PODKARPACKIE",
-        "MAZOWIECKIE",
-        "POMORSKIE",
-        "WIELKOPOLSKIE",
-        "ZACHODNIOPOMORSKIE",
-        "LUBUSKIE",
-        "DOLNOŚLĄSKIE",
-        "OPOLSKIE",
-        "ŁÓDZKIE",
-        "ŚWIĘTOKRZYSKIE",
-        "MAŁOPOLSKIE",
-        "ŚLĄSKIE",
-        "LUBUSKIE",
-        "KUJAWSKO-POMORSKIE",
-        "WARMINSKO-MAZURSKIE",
-    ] | None, Query()] = None,
-     include_inactive: Annotated[bool, Query(description="Include inactive stations")] = False,
-    db: Session = Depends(get_db)
+    voivodeship: Annotated[
+        Literal[
+            "PODKARPACKIE",
+            "MAZOWIECKIE",
+            "POMORSKIE",
+            "WIELKOPOLSKIE",
+            "ZACHODNIOPOMORSKIE",
+            "LUBUSKIE",
+            "DOLNOŚLĄSKIE",
+            "OPOLSKIE",
+            "ŁÓDZKIE",
+            "ŚWIĘTOKRZYSKIE",
+            "MAŁOPOLSKIE",
+            "ŚLĄSKIE",
+            "LUBUSKIE",
+            "KUJAWSKO-POMORSKIE",
+            "WARMINSKO-MAZURSKIE",
+        ]
+        | None,
+        Query(),
+    ] = None,
+    include_inactive: Annotated[
+        bool, Query(description="Include inactive stations")
+    ] = False,
+    db: Session = Depends(get_db),
 ) -> Page[schemes.StationSchema]:
     query = db.query(models.Station)
 
@@ -120,3 +131,30 @@ def get_all_stations(
         query = query.filter(models.Station.end_date.is_(None))
 
     return paginate(query)
+
+
+@router.get("/stations/{station_id}/pollution_indicators")
+def get_pollution_indicators_by_station_id(
+    station_id: int, db: Session = Depends(get_db)
+):
+    """
+    Endpoint to retrieve the names of pollution indicators for a given station.
+    """
+    try:
+        station = (
+            db.query(models.Station).filter(models.Station.id == station_id).first()
+        )
+        sensors = (
+            db.query(models.Sensor)
+            .filter(models.Sensor.station_code == station.code)
+            .all()
+        )
+        if not sensors:
+            raise HTTPException(
+                status_code=404, detail="No sensors found for the given station ID."
+            )
+
+        indicators = [sensor.indicator_name for sensor in sensors]
+        return {"station_id": station_id, "pollution_indicators": indicators}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

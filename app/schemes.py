@@ -1,5 +1,3 @@
-
-
 from datetime import date
 from typing import List, Optional
 from pydantic import BaseModel
@@ -17,7 +15,8 @@ class SensorSchema(BaseModel):
     end_date: Optional[date]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+
 
 class StationSchema(BaseModel):
     id: int
@@ -35,4 +34,4 @@ class StationSchema(BaseModel):
     longitude: float
 
     class Config:
-        orm_mode = True
+        from_attributes = True
