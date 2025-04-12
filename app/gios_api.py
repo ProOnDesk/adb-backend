@@ -15,8 +15,6 @@ class GiosAPI:
         page = 0
         max_page = 1
 
-        print("zaczeto proces fetchowania")
-
         while page <= max_page:
             response = requests.get(
                 f"{GiosAPI.BASE_URL}/metadata/sensors?size=500&page={page}"
@@ -25,11 +23,9 @@ class GiosAPI:
             response_dict = response.json()
 
             max_page = response_dict.get("totalPages", 1) - 1
-            print(f"maksymalna strona: {max_page}")
             sensors_data_list.extend(
                 response_dict.get("Lista metadanych stanowisk pomiarowych", [])
             )
-            print(f"Teraz pobralo strone nr {page}")
             page += 1
 
         sleep(31)
@@ -100,7 +96,6 @@ class GiosAPI:
         for s in sensors_data:
 
             if db.query(Sensor).filter_by(id=int(s.get("Nr"))).first():
-                print("powotrzylo sie")
                 continue
 
             sensor = Sensor(
