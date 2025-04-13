@@ -1,4 +1,13 @@
-from sqlalchemy import Column, String, Integer, Date, ForeignKey, Float
+from sqlalchemy import (
+    Column,
+    String,
+    Integer,
+    Date,
+    ForeignKey,
+    Float,
+    Boolean,
+    DateTime,
+)
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -25,6 +34,14 @@ class Station(Base):
         "Sensor", back_populates="station", cascade="all, delete-orphan"
     )
 
+    @property
+    def count_working_sensors(self) -> int:
+        return sum(
+            1
+            for sensor in self.sensors
+            if (sensor.is_active and sensor.measurement_type == "automatyczny")
+        )
+
     def __repr__(self):
         return f"Station({self.id}, {self.name}, {self.code}, {self.voivodeship}, {self.city})"
 
@@ -41,9 +58,27 @@ class Sensor(Base):
     measurement_type = Column(String, nullable=True)
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
+    is_active = Column(Boolean, default=False, nullable=True)
 
     station = relationship("Station", back_populates="sensors")
 
+    measurements = relationship(
+        "Measurement", back_populates="sensor", cascade="all, delete-orphan"
+    )
+
     def __repr__(self):
         return f"Sensor({self.code}, {self.indicator_code}, {self.averaging_time}, {self.station_code})"
-        
+
+
+class Measurement(Base):
+    __tablename__ = "measurements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, nullable=False)
+    value = Column(Float, nullable=False)
+    sensor_id = Column(Integer, ForeignKey("sensors.id"), nullable=False)
+
+    sensor = relationship("Sensor", back_populates="measurements")
+
+    def __repr__(self):
+        return f"Measurement({self.sensor_code}, {self.timestamp}, {self.value})"

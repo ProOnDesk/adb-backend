@@ -3,11 +3,10 @@ from sqlalchemy.orm import Session
 from app.models import Station, Sensor
 from datetime import datetime
 from time import sleep
-
+data = {}
 
 class GiosAPI:
     BASE_URL = "https://api.gios.gov.pl/pjp-api/v1/rest"
-
     @staticmethod
     def fetch_sensors_data():
         """Pobiera listę stanowisk pomiarowych z paginacją."""
@@ -22,13 +21,12 @@ class GiosAPI:
             response.raise_for_status()
             response_dict = response.json()
 
-            max_page = response_dict.get("totalPages", 1) - 1
+            max_page = response_dict.get("totalPages", 1)
             sensors_data_list.extend(
                 response_dict.get("Lista metadanych stanowisk pomiarowych", [])
             )
             page += 1
-
-        sleep(31)
+            sleep(31)
 
         return sensors_data_list
 
@@ -46,7 +44,7 @@ class GiosAPI:
             response.raise_for_status()
             response_dict = response.json()
 
-            max_page = response_dict.get("totalPages", 1) - 1
+            max_page = response_dict.get("totalPages", 1)
             stations_data_list.extend(
                 response_dict.get("Lista metadanych stacji pomiarowych", [])
             )
@@ -92,14 +90,17 @@ class GiosAPI:
     def load_sensors_to_db(cls, db: Session):
         """Pobiera i zapisuje sensory do bazy danych."""
         sensors_data = cls.fetch_sensors_data()
-
+        data = sensors_data
         for s in sensors_data:
+            sensor_id = int(s.get("Nr"))
 
-            if db.query(Sensor).filter_by(id=int(s.get("Nr"))).first():
-                continue
+            # Sprawdzenie, czy sensor już istnieje
+            if db.query(Sensor).filter_by(id=sensor_id).first():
+                continue  # Pomijamy, jeśli już istnieje
 
+            # Tworzenie nowego obiektu sensora
             sensor = Sensor(
-                id=int(s.get("Nr")),
+                id=sensor_id,
                 code=s.get("Kod stanowiska"),
                 station_code=s.get("Kod stacji"),
                 indicator_code=s.get("Wskaźnik - kod"),
@@ -117,6 +118,28 @@ class GiosAPI:
                     else None
                 ),
             )
-            db.merge(sensor)  # Aktualizacja lub dodanie nowego wpisu
 
-        db.commit()
+            db.add(sensor)  # Dodajemy tylko jeśli nie istnieje
+
+            db.commit()
+
+    @staticmethod
+    def check_sensors_with_data(db: Session):
+        """Sprawdza sensory od id 1 do 10000 i wypisuje te, które zwracają dane pomiarowe."""
+        for sensor_id in range(1, 10000):
+            try:
+                sleep(0.05)
+                response = requests.get(f"{GiosAPI.BASE_URL}/data/getData/{sensor_id}")
+                response.raise_for_status()
+                response_dict = response.json()
+
+                if response_dict.get("Lista danych pomiarowych", None):
+                    sensors = db.query(Sensor).filter_by(id=sensor_id).first()
+                    if sensors:
+                        sensors.is_active = True
+                        db.commit()
+                        print(f"dodano sensor o id {sensor_id} jako aktywny")
+            except requests.exceptions.HTTPError as e:
+                pass
+            except Exception as e:
+                print(f"[{sensor_id}] Unexpected error: {e}")

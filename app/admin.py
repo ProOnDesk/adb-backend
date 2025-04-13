@@ -5,7 +5,7 @@ from starlette.responses import RedirectResponse
 from fastapi import FastAPI
 from sqlalchemy.engine.base import Engine
 from app.config import settings
-from app.views import StationAdminView, SensorAdminView
+from app.views import StationAdminView, SensorAdminView, MeasurementAdminView
 
 
 class AdminAuth(AuthenticationBackend):
@@ -40,3 +40,4 @@ def create_admin(app: FastAPI, engine: Engine) -> None:
 
     admin.add_view(StationAdminView)
     admin.add_view(SensorAdminView)
+    admin.add_view(MeasurementAdminView)

@@ -1,6 +1,6 @@
 from sqladmin import ModelView
 
-from app.models import Station, Sensor
+from app.models import Station, Sensor, Measurement
 
 
 class StationAdminView(ModelView, model=Station):
@@ -8,4 +8,8 @@ class StationAdminView(ModelView, model=Station):
 
 
 class SensorAdminView(ModelView, model=Sensor):
+    column_list = "__all__"
+
+
+class MeasurementAdminView(ModelView, model=Measurement):
     column_list = "__all__"

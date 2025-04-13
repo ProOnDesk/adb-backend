@@ -32,6 +32,7 @@ class StationSchema(BaseModel):
     address: Optional[str]
     latitude: float
     longitude: float
+    count_working_sensors: int = None
 
     class Config:
         from_attributes = True
