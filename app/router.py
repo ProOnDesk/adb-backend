@@ -1,3 +1,5 @@
+from sqlalchemy import func, and_
+
 from typing import Annotated, Literal
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
@@ -129,6 +131,9 @@ def get_all_stations(
     include_inactive: Annotated[
         bool, Query(description="Include inactive stations")
     ] = False,
+    only_with_active_sensors: Annotated[
+        bool, Query(description="Include stations with active sensors")
+    ] = False,
     db: Session = Depends(get_db),
 ) -> Page[schemes.StationSchema]:
     query = db.query(models.Station)
@@ -139,6 +144,19 @@ def get_all_stations(
     if not include_inactive:
         query = query.filter(models.Station.end_date.is_(None))
 
+    if only_with_active_sensors:
+        query = (
+            query.join(models.Station.sensors)
+            .filter(
+                and_(
+                    models.Sensor.is_active == True,
+                    models.Sensor.measurement_type == "automatyczny"
+                )
+            )
+            .group_by(models.Station.id)
+            .having(func.count(models.Sensor.id) > 0)
+        )
+    
     return paginate(query)
 
 
