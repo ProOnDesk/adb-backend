@@ -3,6 +3,11 @@ from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 
+class MeasurementSchema(BaseModel):
+    id: int
+    value: float
+    timestamp: datetime
+    sensor_id: int
 
 class SensorSchema(BaseModel):
     id: int
@@ -15,10 +20,10 @@ class SensorSchema(BaseModel):
     start_date: Optional[date]
     end_date: Optional[date]
     is_active: Optional[bool]
+    latest_measurement: MeasurementSchema = None
 
     class Config:
         from_attributes = True
-
 
 class StationSchema(BaseModel):
     id: int
@@ -43,8 +48,3 @@ class StationSchema(BaseModel):
 class SensorIds(BaseModel):
     sensor_ids: List[int]
 
-class MeasurementSchema(BaseModel):
-    id: int
-    value: float
-    timestamp: datetime
-    sensor_id: int

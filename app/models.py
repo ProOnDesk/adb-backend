@@ -12,6 +12,8 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy import select, func
+from sqlalchemy.orm import object_session
+
 
 
 class Station(Base):
@@ -82,6 +84,17 @@ class Sensor(Base):
     measurements = relationship(
         "Measurement", back_populates="sensor", cascade="all, delete-orphan"
     )
+    _latest_measurement = None
+
+    @property
+    def latest_measurement(self):
+        return self._latest_measurement
+
+    @latest_measurement.setter
+    def latest_measurement(self, value):
+        if value is not None and not isinstance(value, Measurement):
+            raise TypeError("Expected a Measurement instance or None.")
+        self._latest_measurement = value
 
     def __repr__(self):
         return f"Sensor({self.code}, {self.indicator_code}, {self.averaging_time}, {self.station_code})"
@@ -98,4 +111,4 @@ class Measurement(Base):
     sensor = relationship("Sensor", back_populates="measurements")
 
     def __repr__(self):
-        return f"Measurement({self.sensor_code}, {self.timestamp}, {self.value})"
+        return f"Measurement({self.id}, {self.timestamp}, {self.value})"

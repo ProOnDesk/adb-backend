@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from app.database import engine, Base, get_db
 from app import models, schemes
-from fastapi_pagination.ext.sqlalchemy import paginate
-from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlalchemy import paginate, create_page
+from fastapi_pagination import Page, Params
 import requests
 from datetime import datetime
 import threading
@@ -89,12 +89,13 @@ def drop_all_tables(request: Request, db: Session = Depends(get_db)):
 def get_all_sensors_by_station_id(
     station_code: Annotated[str, Query(description="Station Code")],
     include_inactive: Annotated[
-        bool, Query(description="Include inactive stations")
+        bool, Query(description="Include inactive sensors")
     ] = False,
     measurement_type: Annotated[
         Literal["automatyczny", "manualny"],
         Query(description="The type of measurement the sensor performs."),
     ] = None,
+    params: Params = Depends(),
     db: Session = Depends(get_db),
 ) -> Page[schemes.SensorSchema]:
     query = db.query(models.Sensor).filter(models.Sensor.station_code == station_code)
@@ -105,8 +106,24 @@ def get_all_sensors_by_station_id(
     if measurement_type:
         query = query.filter(models.Sensor.measurement_type == measurement_type)
 
-    return paginate(query)
+    sensors = query.all()
 
+    sensor_ids = [s.id for s in sensors]
+
+    latest_measurements = (
+        db.query(models.Measurement)
+        .filter(models.Measurement.sensor_id.in_(sensor_ids))
+        .order_by(models.Measurement.sensor_id, desc(models.Measurement.timestamp))
+        .distinct(models.Measurement.sensor_id)
+        .all()
+    )
+    measurement_map = {m.sensor_id: m for m in latest_measurements}
+
+    for sensor in sensors:
+        if sensor.id in measurement_map:
+            sensor.latest_measurement = measurement_map[sensor.id]
+
+    return create_page(sensors, params=params)
 
 @router.get("/stations")
 def get_all_stations(
@@ -159,7 +176,7 @@ def get_all_stations(
              .group_by(models.Station.id)
              .having(func.count(models.Sensor.id) > 0)
          )
-    
+
     return paginate(query)
 
 
