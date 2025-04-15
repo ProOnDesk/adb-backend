@@ -37,3 +37,7 @@ class StationSchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SensorIds(BaseModel):
+    sensor_ids: List[int]
