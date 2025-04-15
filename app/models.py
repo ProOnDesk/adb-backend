@@ -10,6 +10,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from app.database import Base
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy import select, func
 
 
 class Station(Base):
@@ -34,12 +36,27 @@ class Station(Base):
         "Sensor", back_populates="station", cascade="all, delete-orphan"
     )
 
-    @property
+    @hybrid_property
     def count_working_sensors(self) -> int:
         return sum(
             1
             for sensor in self.sensors
-            if (sensor.is_active and sensor.measurement_type == "automatyczny")
+            if sensor.is_active and sensor.measurement_type == "automatyczny"
+        )
+
+    @count_working_sensors.expression
+    def count_working_sensors(cls):
+        from sqlalchemy.orm import aliased
+        SensorAlias = aliased(Sensor)
+        return (
+            select(func.count(SensorAlias.id))
+            .where(
+                SensorAlias.station_code == cls.code,
+                SensorAlias.is_active == True,
+                SensorAlias.measurement_type == "automatyczny"
+            )
+            .correlate(cls)
+            .scalar_subquery()
         )
 
     def __repr__(self):

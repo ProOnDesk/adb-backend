@@ -1,4 +1,4 @@
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, desc
 
 from typing import Annotated, Literal
 from fastapi import APIRouter, Query
@@ -192,66 +192,80 @@ def get_stations_by_active_sensors(db: Session = Depends(get_db)):
 def get_sensors_from_top_stations(
     db: Session = Depends(get_db),
 ):
-    """Endpoint to get a list of all sensor IDs from the top stations with the most active sensors."""
-    stations = db.query(models.Station).all()
-
-    sensor_ids = []
-    for station in stations:
-        active_sensors = (
-            db.query(models.Sensor)
-            .filter(
-                models.Sensor.station_code == station.code,
-                models.Sensor.is_active == True,
-                models.Sensor.measurement_type == "automatyczny",
-            )
-            .all()
+    # Podzapytanie: zlicz ile aktywnych sensorów ma każda stacja
+    station_sensor_counts = (
+        db.query(
+            models.Sensor.station_code,
+            func.count(models.Sensor.id).label("active_sensor_count"),
         )
-        sensor_ids.extend(sensor.id for sensor in active_sensors)
+        .filter(
+            models.Sensor.is_active == True,
+            models.Sensor.measurement_type == "automatyczny",
+        )
+        .group_by(models.Sensor.station_code)
+        .order_by(desc("active_sensor_count"))
+        .subquery()
+    )
 
-    return {"sensor_ids": sensor_ids}
+    # Główne zapytanie: pobierz ID sensorów tylko z tych stacji
+    sensor_ids = (
+        db.query(models.Sensor.id)
+        .join(
+            station_sensor_counts,
+            models.Sensor.station_code == station_sensor_counts.c.station_code,
+        )
+        .filter(
+            models.Sensor.is_active == True,
+            models.Sensor.measurement_type == "automatyczny",
+        )
+        .all()
+    )
+
+    return {"sensor_ids": [s.id for s in sensor_ids]}
 
 
-def fetch_data_periodically(db: Session):
+def fetch_data_periodically(sensor_ids: list[int], db: Session):
     """Funkcja do cyklicznego pobierania danych dla listy sensorów."""
     url = "https://api.gios.gov.pl/pjp-api/v1/rest/data/getData/"
     for sensor_id in sensor_ids:
-        response = requests.get(f"{url}{sensor_id}")
-        data = response.json()
+        print(sensor_id)
+        # response = requests.get(f"{url}{sensor_id}")
+        # data = response.json()
 
-        measurement_list = data.get("Lista danych pomiarowych", [])
-        for item in measurement_list:
-            sensor_code = item.get("Kod stanowiska")
-            timestamp_str = item.get("Data")
-            value = item.get("Wartość")
+        # measurement_list = data.get("Lista danych pomiarowych", [])
+        # for item in measurement_list:
+        #     sensor_code = item.get("Kod stanowiska")
+        #     timestamp_str = item.get("Data")
+        #     value = item.get("Wartość")
 
-            if value is None:
-                continue  # pomiń brakujące dane
+        #     if value is None:
+        #         continue  # pomiń brakujące dane
 
-            timestamp = datetime.fromisoformat(timestamp_str)
+        #     timestamp = datetime.fromisoformat(timestamp_str)
 
-            # Sprawdź, czy już istnieje taki pomiar
-            existing = (
-                db.query(models.Measurement)
-                .filter_by(timestamp=timestamp, id=sensor_id)
-                .first()
-            )
+        #     # Sprawdź, czy już istnieje taki pomiar
+        #     existing = (
+        #         db.query(models.Measurement)
+        #         .filter_by(timestamp=timestamp, id=sensor_id)
+        #         .first()
+        #     )
 
-            if existing:
-                continue  # już mamy ten pomiar
+        #     if existing:
+        #         continue  # już mamy ten pomiar
 
-            # Dodaj nowy pomiar
-            measurement = models.Measurement(
-                timestamp=timestamp,
-                value=value,
-                sensor_id=sensor_id,
-            )
-            db.add(measurement)
+        #     # Dodaj nowy pomiar
+        #     measurement = models.Measurement(
+        #         timestamp=timestamp,
+        #         value=value,
+        #         sensor_id=sensor_id,
+        #     )
+        #     db.add(measurement)
 
-        db.commit()
+        # db.commit()
 
 
 @router.post("/fetch/")
-def start_fetching(db: Session = Depends(get_db)):
+def start_fetching(sensor_ids: schemes.SensorIds, db: Session = Depends(get_db)):
     """Endpoint do uruchamiania cyklicznego pobierania danych."""
-    fetch_data_periodically(db=db)
+    fetch_data_periodically(sensor_ids=sensor_ids.model_dump().get('sensor_ids', []), db=db)
     return {"message": "Rozpoczęto cykliczne pobieranie danych dla podanych sensorów."}
