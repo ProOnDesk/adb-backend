@@ -2,6 +2,7 @@
 from fastapi_mail import MessageSchema, MessageType, FastMail
 from app.core.schemas import EmailSchema
 from app.core.config import email_conf
+from app
 
 
 async def send_mail(email: EmailSchema):
@@ -24,3 +25,9 @@ async def send_mail(email: EmailSchema):
 
     fm = FastMail(email_conf)
     await fm.send_message(message, template_name=f"{email.template_name}.html")
+
+def fetch_data_periodically(sensor_ids, db):
+    """Funkcja do cyklicznego pobierania danych."""
+    while True:
+        GiosAPI.fetch_measurement_data_for_sensors(sensor_ids=sensor_ids, db=db)
+        time.sleep(15 * 60)  # 15 minut

@@ -1,6 +1,7 @@
 from datetime import date
 from typing import List, Optional
 from pydantic import BaseModel
+from datetime import datetime
 
 
 class SensorSchema(BaseModel):
@@ -40,3 +41,9 @@ class StationSchema(BaseModel):
 
 class SensorIds(BaseModel):
     sensor_ids: List[int]
+
+class MeasurementSchema(BaseModel):
+    id: int
+    value: float
+    timestamp: datetime
+    sensor_id: int

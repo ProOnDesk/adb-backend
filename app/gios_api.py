@@ -1,12 +1,13 @@
 import requests
 from sqlalchemy.orm import Session
-from app.models import Station, Sensor
+from app.models import Station, Sensor, Measurement
 from datetime import datetime
 from time import sleep
 data = {}
 
 class GiosAPI:
-    BASE_URL = "https://api.gios.gov.pl/pjp-api/v1/rest"
+    BASE_URL: str = "https://api.gios.gov.pl/pjp-api/v1/rest"
+        
     @staticmethod
     def fetch_sensors_data():
         """Pobiera listę stanowisk pomiarowych z paginacją."""
@@ -125,8 +126,8 @@ class GiosAPI:
 
     @staticmethod
     def check_sensors_with_data(db: Session):
-        """Sprawdza sensory od id 1 do 10000 i wypisuje te, które zwracają dane pomiarowe."""
-        for sensor_id in range(1, 10000):
+        """Sprawdza sensory od id 1 do 5000 i wypisuje te, które zwracają dane pomiarowe."""
+        for sensor_id in range(1, 5000):
             try:
                 sleep(0.05)
                 response = requests.get(f"{GiosAPI.BASE_URL}/data/getData/{sensor_id}")
@@ -143,3 +144,48 @@ class GiosAPI:
                 pass
             except Exception as e:
                 print(f"[{sensor_id}] Unexpected error: {e}")
+
+    @classmethod
+    def fetch_measurement_data_for_sensors(cls, sensor_ids: list[int], db: Session):
+        """
+        Pobiera dane pomiarowe dla listy sensorów i zapisuje je w bazie danych.
+            sensor_ids (list[int]): Lista identyfikatorów sensorów.
+            db (Session): Sesja bazy danych SQLAlchemy.
+        Metoda iteruje przez podane identyfikatory sensorów, pobiera dane z API GIOS
+        i zapisuje je w bazie danych, unikając duplikatów.
+        """
+
+        url = f"{cls.BASE_URL}/data/getData/"
+        for sensor_id in sensor_ids:
+            response = requests.get(f"{url}{sensor_id}")
+            data = response.json()
+
+            measurement_list = data.get("Lista danych pomiarowych", [])
+            for item in measurement_list:
+                sensor_code = item.get("Kod stanowiska")
+                timestamp_str = item.get("Data")
+                value = item.get("Wartość")
+
+                if value is None:
+                    continue  # pomiń brakujące dane
+
+                timestamp = datetime.fromisoformat(timestamp_str)
+
+                # Sprawdź, czy już istnieje taki pomiar
+                existing = (
+                    db.query(Measurement)
+                    .filter_by(timestamp=timestamp, sensor_id=sensor_id)
+                    .first()
+                )
+                if existing:
+                    continue  # już mamy ten pomiar
+
+                # Dodaj nowy pomiar
+                measurement = Measurement(
+                    timestamp=timestamp,
+                    value=value,
+                    sensor_id=sensor_id,
+                )
+                db.add(measurement)
+
+            db.commit()

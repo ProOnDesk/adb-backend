@@ -15,6 +15,9 @@ from fastapi_pagination.ext.sqlalchemy import paginate
 from fastapi_pagination import Page
 import requests
 from datetime import datetime
+import threading
+import time
+from fastapi import BackgroundTasks
 
 router = APIRouter(prefix=settings.API_V1_STR)
 
@@ -31,10 +34,10 @@ def load_stations(db: Session = Depends(get_db)):
 
 @router.post("/load_sensors/")
 def load_sensors(db: Session = Depends(get_db)):
-    """Endpoint do pobierania i zapisywania sensorów w bazie danych."""
+    """Endpoint do pobierania i zapisywania danych o czujnikach w bazie danych."""
     try:
         GiosAPI.load_sensors_to_db(db)
-        return {"message": "Sensory zostały załadowane do bazy danych."}
+        return {"message": "Czujniki zostały załadowane do bazy danych."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -224,48 +227,48 @@ def get_sensors_from_top_stations(
     return {"sensor_ids": [s.id for s in sensor_ids]}
 
 
-def fetch_data_periodically(sensor_ids: list[int], db: Session):
-    """Funkcja do cyklicznego pobierania danych dla listy sensorów."""
-    url = "https://api.gios.gov.pl/pjp-api/v1/rest/data/getData/"
-    for sensor_id in sensor_ids:
-        print(sensor_id)
-        # response = requests.get(f"{url}{sensor_id}")
-        # data = response.json()
+def fetch_data_periodically(sensor_ids, db):
+    """Funkcja do cyklicznego pobierania danych."""
+    while True:
+        GiosAPI.fetch_measurement_data_for_sensors(sensor_ids=sensor_ids, db=db)
+        time.sleep(15 * 60)  # 15 minut
 
-        # measurement_list = data.get("Lista danych pomiarowych", [])
-        # for item in measurement_list:
-        #     sensor_code = item.get("Kod stanowiska")
-        #     timestamp_str = item.get("Data")
-        #     value = item.get("Wartość")
+@router.post("/fetch-sensors-measurements/")
+def start_fetching(
+    sensor_ids: schemes.SensorIds, 
+    background_tasks: BackgroundTasks, 
+    db: Session = Depends(get_db)
+):
+    """Endpoint do uruchamiania cyklicznego pobierania danych o pomiarow z czujnikow z podanymi id."""
+    background_tasks.add_task(fetch_data_periodically, sensor_ids.model_dump().get('sensor_ids', []), db)
+    return {"message": "Rozpoczęto cykliczne pobieranie danych dla podanych czujników."}
 
-        #     if value is None:
-        #         continue  # pomiń brakujące dane
-
-        #     timestamp = datetime.fromisoformat(timestamp_str)
-
-        #     # Sprawdź, czy już istnieje taki pomiar
-        #     existing = (
-        #         db.query(models.Measurement)
-        #         .filter_by(timestamp=timestamp, id=sensor_id)
-        #         .first()
-        #     )
-
-        #     if existing:
-        #         continue  # już mamy ten pomiar
-
-        #     # Dodaj nowy pomiar
-        #     measurement = models.Measurement(
-        #         timestamp=timestamp,
-        #         value=value,
-        #         sensor_id=sensor_id,
-        #     )
-        #     db.add(measurement)
-
-        # db.commit()
+@router.get("/measurements/{sensor_id}")
+def get_all_measurements_sorted_by_date(
+    sensor_id: int,
+    db: Session = Depends(get_db),
+) -> Page[schemes.MeasurementSchema]:
+    """Endpoint do pobrania wszystkich pomiarów posortowanych według daty."""
+    query = db.query(models.Measurement).filter(models.Measurement.sensor_id == sensor_id).order_by(desc(models.Measurement.timestamp))
+    return paginate(query)
 
 
-@router.post("/fetch/")
-def start_fetching(sensor_ids: schemes.SensorIds, db: Session = Depends(get_db)):
-    """Endpoint do uruchamiania cyklicznego pobierania danych."""
-    fetch_data_periodically(sensor_ids=sensor_ids.model_dump().get('sensor_ids', []), db=db)
-    return {"message": "Rozpoczęto cykliczne pobieranie danych dla podanych sensorów."}
+@router.get("/measurements/latest/{sensor_id}")
+def get_latest_measurement_by_sensor_id(
+    sensor_id: int,
+    db: Session = Depends(get_db),
+) -> schemes.MeasurementSchema:
+    """Endpoint do pobrania najnowszego pomiaru dla podanego ID czujnika."""
+    latest_measurement = (
+        db.query(models.Measurement)
+        .filter(models.Measurement.sensor_id == sensor_id)
+        .order_by(desc(models.Measurement.timestamp))
+        .first()
+    )
+    if not latest_measurement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Nie znaleziono żadnego pomiaru dla czujnika o id: {sensor_id}",
+        )
+    return latest_measurement
+
