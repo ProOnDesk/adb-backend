@@ -14,6 +14,7 @@ class SensorSchema(BaseModel):
     measurement_type: Optional[str]
     start_date: Optional[date]
     end_date: Optional[date]
+    is_active: Optional[bool]
 
     class Config:
         from_attributes = True
