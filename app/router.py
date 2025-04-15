@@ -145,11 +145,17 @@ def get_all_stations(
         query = query.filter(models.Station.end_date.is_(None))
 
     if only_with_active_sensors:
-        stations = query.all()
-
-        for station in stations:
-            if station.count_working_sensors > 0:
-                query = query.filter(models.Station.id == station.id)
+         query = (
+             query.join(models.Station.sensors)
+             .filter(
+                 and_(
+                     models.Sensor.is_active == True,
+                     models.Sensor.measurement_type == "automatyczny"
+                 )
+             )
+             .group_by(models.Station.id)
+             .having(func.count(models.Sensor.id) > 0)
+         )
     
     return paginate(query)
 
