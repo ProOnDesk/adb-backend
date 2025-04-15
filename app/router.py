@@ -146,7 +146,7 @@ def get_all_stations(
 
     if only_with_active_sensors:
         stations = query.all()
-        
+
         for station in stations:
             if station.count_working_sensors > 0:
                 query = query.filter(models.Station.id == station.id)
@@ -182,20 +182,15 @@ def get_stations_by_active_sensors(db: Session = Depends(get_db)):
     ]
 
 
-@router.get("/sensors/from-top-stations")
+@router.get("/sensors/active")
 def get_sensors_from_top_stations(
-    top_n: Annotated[int, Query(description="Number of top stations to include")] = 5,
     db: Session = Depends(get_db),
 ):
     """Endpoint to get a list of all sensor IDs from the top stations with the most active sensors."""
     stations = db.query(models.Station).all()
-    stations_sorted = sorted(
-        stations, key=lambda station: station.count_working_sensors, reverse=True
-    )
-    top_stations = stations_sorted[:top_n]
 
     sensor_ids = []
-    for station in top_stations:
+    for station in stations:
         active_sensors = (
             db.query(models.Sensor)
             .filter(
@@ -208,66 +203,6 @@ def get_sensors_from_top_stations(
         sensor_ids.extend(sensor.id for sensor in active_sensors)
 
     return {"sensor_ids": sensor_ids}
-
-
-sensor_ids = [
-    2654,
-    2656,
-    2657,
-    2659,
-    2658,
-    4768,
-    4769,
-    4770,
-    4774,
-    4772,
-    1058,
-    1060,
-    1061,
-    1062,
-    1625,
-    1630,
-    1634,
-    1638,
-    2503,
-    2504,
-    2505,
-    2506,
-    2787,
-    2788,
-    2789,
-    2794,
-    4191,
-    4192,
-    4194,
-    4193,
-    4704,
-    4706,
-    4707,
-    4709,
-    4757,
-    4758,
-    4759,
-    4760,
-    221,
-    222,
-    220,
-    397,
-    398,
-    400,
-    1402,
-    1403,
-    1405,
-    1414,
-    1416,
-    1417,
-    1581,
-    1582,
-    1583,
-    2519,
-    2522,
-    2523,
-]
 
 
 def fetch_data_periodically(db: Session):
