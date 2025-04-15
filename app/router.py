@@ -97,7 +97,7 @@ def get_all_sensors_by_station_id(
     query = db.query(models.Sensor).filter(models.Sensor.station_code == station_code)
 
     if not include_inactive:
-        query = query.filter(models.Sensor.end_date.is_(None))
+        query = query.filter(models.Sensor.is_active == True)
 
     if measurement_type:
         query = query.filter(models.Sensor.measurement_type == measurement_type)
