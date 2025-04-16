@@ -20,7 +20,7 @@ class SensorSchema(BaseModel):
     start_date: Optional[date]
     end_date: Optional[date]
     is_active: Optional[bool]
-    latest_measurement: MeasurementSchema = None
+    latest_measurement: MeasurementSchema | None = None
 
     class Config:
         from_attributes = True

@@ -181,11 +181,12 @@ def get_all_stations(
 
 
 @router.get("/check_sensors_with_data")
-def check_sensors_with_data(
+async def check_sensors_with_data(
     db: Session = Depends(get_db),
 ):
-
-    GiosAPI.check_sensors_with_data(db=db)
+    db.query(models.Sensor).update({models.Sensor.is_active: False})
+    db.commit()
+    await GiosAPI.check_sensors_with_data(db=db)
     return "ok"
 
 

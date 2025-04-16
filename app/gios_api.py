@@ -125,21 +125,28 @@ class GiosAPI:
             db.commit()
 
     @staticmethod
-    def check_sensors_with_data(db: Session):
+    async def check_sensors_with_data(db: Session):
         """Sprawdza sensory od id 1 do 5000 i wypisuje te, które zwracają dane pomiarowe."""
-        for sensor_id in range(1, 5000):
+        sensor_count = db.query(Sensor).count()
+        for sensor_id in range(1, sensor_count + 669):
             try:
-                sleep(0.05)
+                print("printuj sie skurwsywnie jebany")
                 response = requests.get(f"{GiosAPI.BASE_URL}/data/getData/{sensor_id}")
-                response.raise_for_status()
-                response_dict = response.json()
+                print(response.status_code)
+              
+                if response.status_code == 200:
+                    response.raise_for_status()
+                    response_dict = response.json()
 
-                if response_dict.get("Lista danych pomiarowych", None):
-                    sensors = db.query(Sensor).filter_by(id=sensor_id).first()
-                    if sensors:
-                        sensors.is_active = True
-                        db.commit()
-                        print(f"dodano sensor o id {sensor_id} jako aktywny")
+                    if response_dict.get("Lista danych pomiarowych", None):
+                        sensors = db.query(Sensor).filter_by(id=sensor_id).first()
+                        if sensors:
+                            sensors.is_active = True
+                            sensors.measurement_type = "automatyczny"
+                            sensors.end_date = None
+                            sensors.averaging_time = "1-godzinny"
+                            db.commit()
+                            print(f"dodano sensor o id {sensor_id} jako aktywny")
             except requests.exceptions.HTTPError as e:
                 pass
             except Exception as e:
