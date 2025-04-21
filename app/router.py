@@ -106,10 +106,12 @@ def get_all_sensors_by_station_id(
     if measurement_type:
         query = query.filter(models.Sensor.measurement_type == measurement_type)
 
-    sensors = query.all()
+    # Paginate query
+    page = paginate(query, params)
+    sensors = page.items
 
+    # Get latest measurements for paginated sensors only
     sensor_ids = [s.id for s in sensors]
-
     latest_measurements = (
         db.query(models.Measurement)
         .filter(models.Measurement.sensor_id.in_(sensor_ids))
@@ -123,7 +125,7 @@ def get_all_sensors_by_station_id(
         if sensor.id in measurement_map:
             sensor.latest_measurement = measurement_map[sensor.id]
 
-    return create_page(sensors, params=params)
+    return page
 
 @router.get("/stations")
 def get_all_stations(
