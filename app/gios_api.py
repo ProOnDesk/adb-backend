@@ -1,4 +1,6 @@
 import requests
+import httpx
+import asyncio
 from sqlalchemy.orm import Session
 from app.models import Station, Sensor, Measurement
 from datetime import datetime
@@ -126,32 +128,50 @@ class GiosAPI:
 
     @staticmethod
     async def check_sensors_with_data(db: Session):
-        """Sprawdza sensory od id 1 do 5000 i wypisuje te, które zwracają dane pomiarowe."""
+        """Sprawdza sensory od 1 do N i oznacza jako aktywne te, które mają dane."""
         sensor_count = db.query(Sensor).count()
-        for sensor_id in range(1, sensor_count + 669):
+        sensor_ids = range(1, sensor_count + 669)  # Można to później poprawić
+
+        sem = asyncio.Semaphore(25)
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            for i in range(0, len(sensor_ids), 25):
+                batch = sensor_ids[i:i+25]
+                tasks = [
+                    GiosAPI.fetch_sensor_status(sensor_id, client, sem)
+                    for sensor_id in batch
+                ]
+                results = await asyncio.gather(*tasks)
+                active_sensor_ids = list(filter(None, results))
+
+                for sensor_id in active_sensor_ids:
+                    sensor = db.query(Sensor).filter_by(id=sensor_id).first()
+                    if sensor:
+                        sensor.is_active = True
+                        sensor.measurement_type = "automatyczny"
+                        sensor.end_date = None
+                        sensor.averaging_time = "1-godzinny"
+                        print(f"[✓] Sensor aktywny: {sensor_id}")
+                db.commit()
+
+                await asyncio.sleep(1)
+                
+    @staticmethod
+    async def fetch_sensor_status(sensor_id: int, client: httpx.AsyncClient, sem: asyncio.Semaphore):
+        """Sprawdza, czy sensor ma dane pomiarowe i zwraca jego ID jeśli tak."""
+        url = f"{GiosAPI.BASE_URL}/data/getData/{sensor_id}"
+
+        async with sem:
             try:
-                print("printuj sie skurwsywnie jebany")
-                response = requests.get(f"{GiosAPI.BASE_URL}/data/getData/{sensor_id}")
-                print(response.status_code)
-              
+                response = await client.get(url)
                 if response.status_code == 200:
-                    response.raise_for_status()
-                    response_dict = response.json()
-
-                    if response_dict.get("Lista danych pomiarowych", None):
-                        sensors = db.query(Sensor).filter_by(id=sensor_id).first()
-                        if sensors:
-                            sensors.is_active = True
-                            sensors.measurement_type = "automatyczny"
-                            sensors.end_date = None
-                            sensors.averaging_time = "1-godzinny"
-                            db.commit()
-                            print(f"dodano sensor o id {sensor_id} jako aktywny")
-            except requests.exceptions.HTTPError as e:
-                pass
+                    data = response.json()
+                    if data.get("Lista danych pomiarowych"):
+                        return sensor_id  # Sensor aktywny
             except Exception as e:
-                print(f"[{sensor_id}] Unexpected error: {e}")
-
+                print(f"[{sensor_id}] Błąd: {e}")
+        return None
+    
     @classmethod
     def fetch_measurement_data_for_sensors(cls, sensor_ids: list[int], db: Session):
         """
