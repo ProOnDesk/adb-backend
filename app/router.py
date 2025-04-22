@@ -185,7 +185,7 @@ def get_all_stations(
 def get_station_by_code(
     station_code: str,
     db: Session = Depends(get_db),
-):
+)-> schemes.StationSchema:
     station = db.query(models.Station).filter(models.Station.code == station_code).first()
 
     if not station:
