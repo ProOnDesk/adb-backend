@@ -181,6 +181,18 @@ def get_all_stations(
 
     return paginate(query)
 
+@router.get("/stations/{station_code}")
+def get_station_by_code(
+    station_code: str,
+    db: Session = Depends(get_db),
+):
+    station = db.query(models.Station).filter(models.Station.code == station_code).first()
+
+    if not station:
+        raise HTTPException(status_code=404, detail="Stacja nie znaleziona")
+
+    return station
+
 
 @router.get("/check_sensors_with_data")
 async def check_sensors_with_data(
