@@ -14,10 +14,11 @@ from app import models, schemes
 from fastapi_pagination.ext.sqlalchemy import paginate, create_page
 from fastapi_pagination import Page, Params
 import requests
-from datetime import datetime
+from datetime import datetime, date
 import threading
 import time
 from fastapi import BackgroundTasks
+
 
 router = APIRouter(prefix=settings.API_V1_STR)
 
@@ -275,14 +276,24 @@ def start_fetching(
     background_tasks.add_task(fetch_data_periodically, sensor_ids.model_dump().get('sensor_ids', []), db)
     return {"message": "Rozpoczęto cykliczne pobieranie danych dla podanych czujników."}
 
+
 @router.get("/measurements/{sensor_id}")
-def get_all_measurements_sorted_by_date(
+def get_measurements_by_date(
     sensor_id: int,
+    date_filter: date = Query(None, description="Format: YYYY-MM-DD"),
     db: Session = Depends(get_db),
 ) -> Page[schemes.MeasurementSchema]:
-    """Endpoint do pobrania wszystkich pomiarów posortowanych według daty."""
-    query = db.query(models.Measurement).filter(models.Measurement.sensor_id == sensor_id).order_by(desc(models.Measurement.timestamp))
+    """Endpoint do pobierania pomiarów z danego dnia."""
+    query = db.query(models.Measurement).filter(models.Measurement.sensor_id == sensor_id)
+    
+    if date_filter:
+        start = datetime.combine(date_filter, datetime.min.time())
+        end = datetime.combine(date_filter, datetime.max.time())
+        query = query.filter(models.Measurement.timestamp.between(start, end))
+
+    query = query.order_by(desc(models.Measurement.timestamp))
     return paginate(query)
+
 
 
 @router.get("/measurements/latest/{sensor_id}")
