@@ -48,3 +48,6 @@ class StationSchema(BaseModel):
 class SensorIds(BaseModel):
     sensor_ids: List[int]
 
+class ReportSchema(SensorIds):
+    start_time: datetime
+    end_time: datetime
