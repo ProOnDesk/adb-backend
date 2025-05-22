@@ -381,7 +381,8 @@ def generate_pdf_station_report_by_station_id(
 
     station = db.query(models.Station).filter(models.Station.id == station_id).first()
     if not station:
-        return {"error": "Station not found"}
+        raise HTTPException(status=status.HTTP_404_NOT_FOUND, 
+                            detail=f"Nie znaleziono żadnego pomiaru dla stacji o id: {station_id}")
 
     sensors = db.query(models.Sensor).filter(models.Sensor.id.in_(report.sensor_ids)).all()
 
@@ -532,7 +533,8 @@ def generate_csv_station_report_by_station_id(
 ):
     station = db.query(models.Station).filter(models.Station.id == station_id).first()
     if not station:
-        return {"error": "Station not found"}
+        raise HTTPException(status=status.HTTP_404_NOT_FOUND, 
+                            detail=f"Nie znaleziono żadnego pomiaru dla stacji o id: {station_id}")
 
     sensors = db.query(models.Sensor).filter(
         models.Sensor.id.in_(report.sensor_ids),
@@ -564,5 +566,5 @@ def generate_csv_station_report_by_station_id(
     return StreamingResponse(
         output,
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=raport_stacji_{station_id}.csv"}
+        headers={"Content-Disposition": f"attachment; filename=raport_stacji_{station.code}.csv"}
     )
